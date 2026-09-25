@@ -2,7 +2,6 @@
 
 const { Collection } = require('@discordjs/collection');
 const { makeURLSearchParams } = require('@discordjs/rest');
-const { isFileBodyEncodable, isJSONEncodable } = require('@discordjs/util');
 const { Routes } = require('discord-api-types/v10');
 const { DiscordjsTypeError, ErrorCodes } = require('../errors/index.js');
 const { Message } = require('../structures/Message.js');
@@ -116,12 +115,12 @@ class MessageManager extends CachedManager {
     return this._add(data, cache);
   }
 
-  async _fetchMany({ cache, ...apiOptions } = {}) {
+  async _fetchMany(options = {}) {
     const data = await this.client.rest.get(Routes.channelMessages(this.channel.id), {
-      query: makeURLSearchParams(apiOptions),
+      query: makeURLSearchParams(options),
     });
 
-    return data.reduce((_data, message) => _data.set(message.id, this._add(message, cache)), new Collection());
+    return data.reduce((_data, message) => _data.set(message.id, this._add(message, options.cache)), new Collection());
   }
 
   /**
@@ -151,8 +150,8 @@ class MessageManager extends CachedManager {
    */
 
   /**
-   * Fetches the pinned messages of this channel, returning a paginated result.
-   * <info>The returned messages do not contain any reaction data.
+   * Fetches the pinned messages of this channel and returns a collection of them.
+   * <info>The returned Collection does not contain any reaction data of the messages.
    * Those need to be fetched separately.</info>
    *
    * @param {FetchPinnedMessagesOptions} [options={}] Options for fetching pinned messages
@@ -163,11 +162,11 @@ class MessageManager extends CachedManager {
    *   .then(messages => console.log(`Received ${messages.items.length} messages`))
    *   .catch(console.error);
    */
-  async fetchPins({ cache, ...apiOptions } = {}) {
+  async fetchPins(options = {}) {
     const data = await this.client.rest.get(Routes.channelMessagesPins(this.channel.id), {
       query: makeURLSearchParams({
-        ...apiOptions,
-        before: apiOptions.before && new Date(apiOptions.before).toISOString(),
+        ...options,
+        before: options.before && new Date(options.before).toISOString(),
       }),
     });
 
@@ -177,7 +176,7 @@ class MessageManager extends CachedManager {
         get pinnedAt() {
           return new Date(this.pinnedTimestamp);
         },
-        message: this._add(item.message, cache),
+        message: this._add(item.message, options.cache),
       })),
       hasMore: data.has_more,
     };
@@ -224,27 +223,21 @@ class MessageManager extends CachedManager {
    * Edits a message, even if it's not cached.
    *
    * @param {MessageResolvable} message The message to edit
-   * @param {string|MessageEditOptions|MessagePayload|FileBodyEncodable<RESTPatchAPIChannelMessageJSONBody>|JSONEncodable<RESTPatchAPIChannelMessageJSONBody>} options The options to edit the message
+   * @param {string|MessageEditOptions|MessagePayload} options The options to edit the message
    * @returns {Promise<Message>}
    */
   async edit(message, options) {
     const messageId = this.resolveId(message);
     if (!messageId) throw new DiscordjsTypeError(ErrorCodes.InvalidType, 'message', 'MessageResolvable');
 
-    let payload;
-    if (options instanceof MessagePayload) {
-      payload = await options.resolveBody().resolveFiles();
-    } else if (isFileBodyEncodable(options)) {
-      payload = options.toFileBody();
-    } else if (isJSONEncodable(options)) {
-      payload = { body: options.toJSON() };
-    } else {
-      payload = await MessagePayload.create(message instanceof Message ? message : this, options)
-        .resolveBody()
-        .resolveFiles();
-    }
-
-    const data = await this.client.rest.patch(Routes.channelMessage(this.channel.id, messageId), payload);
+    const { body, files } = await (
+      options instanceof MessagePayload
+        ? options
+        : MessagePayload.create(message instanceof Message ? message : this, options)
+    )
+      .resolveBody()
+      .resolveFiles();
+    const data = await this.client.rest.patch(Routes.channelMessage(this.channel.id, messageId), { body, files });
 
     const existing = this.cache.get(messageId);
     if (existing) {

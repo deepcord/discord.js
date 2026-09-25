@@ -1,7 +1,6 @@
 'use strict';
 
 const { ClientApplication } = require('../../../structures/ClientApplication.js');
-const { Status } = require('../../../util/Status.js');
 
 let ClientUser;
 
@@ -15,7 +14,6 @@ module.exports = (client, { d: data }, shardId) => {
   }
 
   for (const guild of data.guilds) {
-    client.expectedGuilds.add(guild.id);
     guild.shardId = shardId;
     client.guilds._add(guild);
   }
@@ -25,6 +23,4 @@ module.exports = (client, { d: data }, shardId) => {
   } else {
     client.application = new ClientApplication(client, data.application);
   }
-
-  client.status = Status.WaitingForGuilds;
 };

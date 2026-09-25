@@ -3,13 +3,9 @@
 const { Buffer } = require('node:buffer');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { lazy } = require('@discordjs/util');
 const { fetch } = require('undici');
 const { DiscordjsError, DiscordjsTypeError, ErrorCodes } = require('../errors/index.js');
 const { BaseInvite } = require('../structures/BaseInvite.js');
-
-// Fixes circular dependencies.
-const getGuildTemplate = lazy(() => require('../structures/GuildTemplate.js').GuildTemplate);
 
 /**
  * Data that can be resolved to give an invite code. This can be:
@@ -58,7 +54,8 @@ function resolveInviteCode(data) {
  * @private
  */
 function resolveGuildTemplateCode(data) {
-  return resolveCode(data, getGuildTemplate().GuildTemplatesPattern);
+  const { GuildTemplate } = require('../structures/GuildTemplate.js');
+  return resolveCode(data, GuildTemplate.GuildTemplatesPattern);
 }
 
 /**

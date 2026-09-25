@@ -10,7 +10,6 @@ class MessageCreateAction extends Action {
       id: data.channel_id,
       author: data.author,
       ...('guild_id' in data && { guild_id: data.guild_id }),
-      ...('channel_type' in data && { type: data.channel_type }),
     });
     if (channel) {
       if (!channel.isTextBased()) return {};

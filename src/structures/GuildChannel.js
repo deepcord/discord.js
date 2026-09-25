@@ -116,29 +116,27 @@ class GuildChannel extends BaseChannel {
    * @readonly
    */
   get permissionsLocked() {
-    const { parent } = this;
-    if (!parent) return null;
+    if (!this.parent) return null;
 
     // Get all overwrites
     const overwriteIds = new Set([
       ...this.permissionOverwrites.cache.keys(),
-      ...parent.permissionOverwrites.cache.keys(),
+      ...this.parent.permissionOverwrites.cache.keys(),
     ]);
 
     // Compare all overwrites
     return [...overwriteIds].every(key => {
       const channelVal = this.permissionOverwrites.cache.get(key);
-      const parentVal = parent.permissionOverwrites.cache.get(key);
+      const parentVal = this.parent.permissionOverwrites.cache.get(key);
 
       // Handle empty overwrite
       if (
-        key === this.guildId &&
-        ((!channelVal &&
+        (!channelVal &&
           parentVal.deny.bitfield === PermissionsBitField.DefaultBit &&
           parentVal.allow.bitfield === PermissionsBitField.DefaultBit) ||
-          (!parentVal &&
-            channelVal.deny.bitfield === PermissionsBitField.DefaultBit &&
-            channelVal.allow.bitfield === PermissionsBitField.DefaultBit))
+        (!parentVal &&
+          channelVal.deny.bitfield === PermissionsBitField.DefaultBit &&
+          channelVal.allow.bitfield === PermissionsBitField.DefaultBit)
       ) {
         return true;
       }
@@ -464,6 +462,7 @@ class GuildChannel extends BaseChannel {
    * @readonly
    */
   get manageable() {
+    if (this.client.user.id === this.guild.ownerId) return true;
     const permissions = this.permissionsFor(this.client.user);
     if (!permissions) return false;
 
@@ -471,11 +470,9 @@ class GuildChannel extends BaseChannel {
     if (permissions.has(PermissionFlagsBits.Administrator, false)) return true;
     if (this.guild.members.me.communicationDisabledUntilTimestamp > Date.now()) return false;
 
-    const baseBitfield = PermissionFlagsBits.ViewChannel | PermissionFlagsBits.ManageChannels;
     const bitfield = VoiceBasedChannelTypes.includes(this.type)
-      ? baseBitfield | PermissionFlagsBits.Connect
-      : baseBitfield;
-
+      ? PermissionFlagsBits.ManageChannels | PermissionFlagsBits.Connect
+      : PermissionFlagsBits.ViewChannel | PermissionFlagsBits.ManageChannels;
     return permissions.has(bitfield, false);
   }
 
@@ -486,6 +483,7 @@ class GuildChannel extends BaseChannel {
    * @readonly
    */
   get viewable() {
+    if (this.client.user.id === this.guild.ownerId) return true;
     const permissions = this.permissionsFor(this.client.user);
     if (!permissions) return false;
     return permissions.has(PermissionFlagsBits.ViewChannel, false);

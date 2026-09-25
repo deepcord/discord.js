@@ -1,4 +1,5 @@
 import { readdir, writeFile } from 'node:fs/promises';
+import { URL } from 'node:url';
 
 async function writeWebsocketHandlerImports() {
   const lines = ["'use strict';\n", 'const PacketHandlers = Object.fromEntries(['];

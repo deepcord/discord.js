@@ -1,8 +1,7 @@
 'use strict';
 
-const { AttachmentFlags } = require('discord-api-types/v10');
 const { AttachmentFlagsBitField } = require('../util/AttachmentFlagsBitField.js');
-const { flatten } = require('../util/Util.js');
+const { basename, flatten } = require('../util/Util.js');
 
 /**
  * @typedef {Object} AttachmentPayload
@@ -171,7 +170,7 @@ class Attachment {
    * @readonly
    */
   get spoiler() {
-    return this.flags.has(AttachmentFlags.IsSpoiler);
+    return basename(this.url ?? this.name).startsWith('SPOILER_');
   }
 
   toJSON() {

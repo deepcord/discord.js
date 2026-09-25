@@ -9,7 +9,6 @@ const { ModalComponentResolver } = require('./ModalComponentResolver.js');
 const { InteractionResponses } = require('./interfaces/InteractionResponses.js');
 
 const getMessage = lazy(() => require('./Message.js').Message);
-const getAttachment = lazy(() => require('./Attachment.js').Attachment);
 
 /**
  * @typedef {Object} BaseModalData
@@ -21,35 +20,10 @@ const getAttachment = lazy(() => require('./Attachment.js').Attachment);
  * @typedef {BaseModalData} SelectMenuModalData
  * @property {string} customId The custom id of the component
  * @property {string[]} values The values of the component
- * @property {Collection<Snowflake, GuildMember|APIGuildMember>} [members] The resolved members
- * @property {Collection<Snowflake, User|APIUser>} [users] The resolved users
- * @property {Collection<Snowflake, Role|APIRole>} [roles] The resolved roles
- * @property {Collection<Snowflake, BaseChannel|APIChannel>} [channels] The resolved channels
- */
-
-/**
- * @typedef {BaseModalData} FileUploadModalData
- * @property {string} customId The custom id of the file upload
- * @property {Snowflake[]} values The values of the file upload
- * @property {Collection<Snowflake, Attachment>} [attachments] The resolved attachments
- */
-
-/**
- * @typedef {BaseModalData} RadioGroupModalData
- * @property {string} customId The custom id of the radio group
- * @property {?string} value The value selected for the radio group
- */
-
-/**
- * @typedef {BaseModalData} CheckboxGroupModalData
- * @property {string} customId The custom id of the checkbox group
- * @property {string[]} values The values selected for the checkbox group
- */
-
-/**
- * @typedef {BaseModalData} CheckboxModalData
- * @property {string} customId The custom id of the checkbox
- * @property {boolean} value Whether this checkbox was selected
+ * @property {Collection<string, GuildMember|APIGuildMember>} [members] The resolved members
+ * @property {Collection<string, User|APIUser>} [users] The resolved users
+ * @property {Collection<string, Role|APIRole>} [roles] The resolved roles
+ * @property {Collection<string, BaseChannel|APIChannel>} [channels] The resolved channels
  */
 
 /**
@@ -63,7 +37,7 @@ const getAttachment = lazy(() => require('./Attachment.js').Attachment);
  */
 
 /**
- * @typedef {SelectMenuModalData|TextInputModalData|FileUploadModalData|RadioGroupModalData|CheckboxGroupModalData|CheckboxModalData} ModalData
+ * @typedef {SelectMenuModalData|TextInputModalData} ModalData
  */
 
 /**
@@ -181,58 +155,31 @@ class ModalSubmitInteraction extends BaseInteraction {
     if (rawComponent.values) {
       data.values = rawComponent.values;
       if (resolved) {
-        const { members, users, channels, roles, attachments } = resolved;
-        const valueSet = new Set(rawComponent.values);
-
-        if (users) {
-          data.users = new Collection();
-
-          for (const [id, user] of Object.entries(users)) {
-            if (valueSet.has(id)) {
-              data.users.set(id, this.client.users._add(user));
+        const resolveCollection = (resolvedData, resolver) => {
+          const collection = new Collection();
+          for (const value of data.values) {
+            if (resolvedData?.[value]) {
+              collection.set(value, resolver(resolvedData[value]));
             }
           }
-        }
 
-        if (channels) {
-          data.channels = new Collection();
+          return collection.size ? collection : null;
+        };
 
-          for (const [id, apiChannel] of Object.entries(channels)) {
-            if (valueSet.has(id)) {
-              data.channels.set(id, this.client.channels._add(apiChannel, this.guild) ?? apiChannel);
-            }
-          }
-        }
+        const users = resolveCollection(resolved.users, user => this.client.users._add(user));
+        if (users) data.users = users;
 
-        if (members) {
-          data.members = new Collection();
+        const channels = resolveCollection(
+          resolved.channels,
+          channel => this.client.channels._add(channel, this.guild) ?? channel,
+        );
+        if (channels) data.channels = channels;
 
-          for (const [id, member] of Object.entries(members)) {
-            if (valueSet.has(id)) {
-              const user = users?.[id];
-              data.members.set(id, this.guild?.members._add({ user, ...member }) ?? member);
-            }
-          }
-        }
+        const members = resolveCollection(resolved.members, member => this.guild?.members._add(member) ?? member);
+        if (members) data.members = members;
 
-        if (roles) {
-          data.roles = new Collection();
-
-          for (const [id, role] of Object.entries(roles)) {
-            if (valueSet.has(id)) {
-              data.roles.set(id, this.guild?.roles._add(role) ?? role);
-            }
-          }
-        }
-
-        if (attachments) {
-          data.attachments = new Collection();
-          for (const [id, attachment] of Object.entries(attachments)) {
-            if (valueSet.has(id)) {
-              data.attachments.set(id, new (getAttachment())(attachment));
-            }
-          }
-        }
+        const roles = resolveCollection(resolved.roles, role => this.guild?.roles._add(role) ?? role);
+        if (roles) data.roles = roles;
       }
     }
 

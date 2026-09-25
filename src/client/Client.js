@@ -3,9 +3,8 @@
 const process = require('node:process');
 const { clearTimeout, setImmediate, setTimeout } = require('node:timers');
 const { Collection } = require('@discordjs/collection');
-const { REST, RESTEvents, makeURLSearchParams } = require('@discordjs/rest');
+const { makeURLSearchParams } = require('@discordjs/rest');
 const { WebSocketManager, WebSocketShardEvents, WebSocketShardStatus } = require('@discordjs/ws');
-const { AsyncEventEmitter } = require('@vladfrangu/async_event_emitter');
 const { GatewayDispatchEvents, GatewayIntentBits, OAuth2Scopes, Routes } = require('discord-api-types/v10');
 const { DiscordjsError, DiscordjsTypeError, ErrorCodes } = require('../errors/index.js');
 const { ChannelManager } = require('../managers/ChannelManager.js');
@@ -29,7 +28,7 @@ const { Options } = require('../util/Options.js');
 const { PermissionsBitField } = require('../util/PermissionsBitField.js');
 const { Status } = require('../util/Status.js');
 const { Sweepers } = require('../util/Sweepers.js');
-const { flatten } = require('../util/Util.js');
+const { BaseClient } = require('./BaseClient.js');
 const { ActionsManager } = require('./actions/ActionsManager.js');
 const { ClientVoiceManager } = require('./voice/ClientVoiceManager.js');
 const { PacketHandlers } = require('./websocket/handlers/index.js');
@@ -48,66 +47,24 @@ const BeforeReadyWhitelist = [
 /**
  * The main hub for interacting with the Discord API, and the starting point for any bot.
  *
- * @extends {AsyncEventEmitter}
+ * @extends {BaseClient}
  */
-class Client extends AsyncEventEmitter {
+class Client extends BaseClient {
   /**
    * @param {ClientOptions} options Options for the client
    */
   constructor(options) {
-    super();
-
-    if (typeof options !== 'object' || options === null) {
-      throw new DiscordjsTypeError(ErrorCodes.InvalidType, 'options', 'object', true);
-    }
-
-    const defaultOptions = Options.createDefault();
-    /**
-     * The options the client was instantiated with
-     *
-     * @type {ClientOptions}
-     */
-    this.options = {
-      ...defaultOptions,
-      ...options,
-      presence: {
-        ...defaultOptions.presence,
-        ...options.presence,
-      },
-      sweepers: {
-        ...defaultOptions.sweepers,
-        ...options.sweepers,
-      },
-      ws: {
-        ...defaultOptions.ws,
-        ...options.ws,
-      },
-      rest: {
-        ...defaultOptions.rest,
-        ...options.rest,
-        userAgentAppendix: options.rest?.userAgentAppendix
-          ? `${Options.userAgentAppendix} ${options.rest.userAgentAppendix}`
-          : Options.userAgentAppendix,
-      },
-    };
-
-    /**
-     * The REST manager of the client
-     *
-     * @type {REST}
-     */
-    this.rest = new REST(this.options.rest);
-
-    this.rest.on(RESTEvents.Debug, message => this.emit(Events.Debug, message));
+    super(options);
 
     const data = require('node:worker_threads').workerData ?? process.env;
+    const defaults = Options.createDefault();
 
-    if (this.options.ws.shardIds === defaultOptions.ws.shardIds && 'SHARDS' in data) {
+    if (this.options.ws.shardIds === defaults.ws.shardIds && 'SHARDS' in data) {
       const shards = JSON.parse(data.SHARDS);
       this.options.ws.shardIds = Array.isArray(shards) ? shards : [shards];
     }
 
-    if (this.options.ws.shardCount === defaultOptions.ws.shardCount && 'SHARD_COUNT' in data) {
+    if (this.options.ws.shardCount === defaults.ws.shardCount && 'SHARD_COUNT' in data) {
       this.options.ws.shardCount = Number(data.SHARD_COUNT);
     }
 
@@ -206,6 +163,7 @@ class Client extends AsyncEventEmitter {
     const wsOptions = {
       ...this.options.ws,
       intents: this.options.intents.bitfield,
+      fetchGatewayInformation: () => this.rest.get(Routes.gatewayBot()),
       // Explicitly nulled to always be set using `setToken` in `login`
       token: null,
     };
@@ -321,7 +279,7 @@ class Client extends AsyncEventEmitter {
     this.ws.setToken(this.token);
 
     try {
-      await this.ws.connect({ gatewayInformation: await this.rest.get(Routes.gatewayBot()) });
+      await this.ws.connect();
       return this.token;
     } catch (error) {
       await this.destroy();
@@ -388,6 +346,15 @@ class Client extends AsyncEventEmitter {
     );
     this.ws.on(WebSocketShardEvents.Dispatch, this._handlePacket.bind(this));
 
+    this.ws.on(WebSocketShardEvents.Ready, async data => {
+      for (const guild of data.guilds) {
+        this.expectedGuilds.add(guild.id);
+      }
+
+      this.status = Status.WaitingForGuilds;
+      await this._checkReady();
+    });
+
     this.ws.on(WebSocketShardEvents.HeartbeatComplete, ({ heartbeatAt, latency }, shardId) => {
       this.emit(Events.Debug, `[WS => Shard ${shardId}] Heartbeat acknowledged, latency of ${latency}ms.`);
       this.lastPingTimestamps.set(shardId, heartbeatAt);
@@ -417,9 +384,7 @@ class Client extends AsyncEventEmitter {
         PacketHandlers[packet.t](this, packet, shardId);
       }
 
-      if (packet.t === GatewayDispatchEvents.Ready) {
-        await this._checkReady();
-      } else if (this.status === Status.WaitingForGuilds && WaitingForGuildEvents.includes(packet.t)) {
+      if (this.status === Status.WaitingForGuilds && WaitingForGuildEvents.includes(packet.t)) {
         this.expectedGuilds.delete(packet.d.id);
         await this._checkReady();
       }
@@ -433,7 +398,7 @@ class Client extends AsyncEventEmitter {
    * @private
    */
   async _broadcast(packet) {
-    const shardIds = this.ws.getShardIds();
+    const shardIds = await this.ws.getShardIds();
     return Promise.all(shardIds.map(shardId => this.ws.send(shardId, packet)));
   }
 
@@ -477,56 +442,12 @@ class Client extends AsyncEventEmitter {
   }
 
   /**
-   * Options used for deleting a webhook.
-   *
-   * @typedef {Object} WebhookDeleteOptions
-   * @property {string} [token] Token of the webhook
-   * @property {string} [reason] The reason for deleting the webhook
-   */
-
-  /**
-   * Deletes a webhook.
-   *
-   * @param {Snowflake} id The webhook's id
-   * @param {WebhookDeleteOptions} [options] Options for deleting the webhook
-   * @returns {Promise<void>}
-   */
-  async deleteWebhook(id, { token, reason } = {}) {
-    await this.rest.delete(Routes.webhook(id, token), { auth: !token, reason });
-  }
-
-  /**
-   * Increments max listeners by one, if they are not zero.
-   *
-   * @private
-   */
-  incrementMaxListeners() {
-    const maxListeners = this.getMaxListeners();
-    if (maxListeners !== 0) {
-      this.setMaxListeners(maxListeners + 1);
-    }
-  }
-
-  /**
-   * Decrements max listeners by one, if they are not zero.
-   *
-   * @private
-   */
-  decrementMaxListeners() {
-    const maxListeners = this.getMaxListeners();
-    if (maxListeners !== 0) {
-      this.setMaxListeners(maxListeners - 1);
-    }
-  }
-
-  /**
-   * Destroys all assets used by the client.
+   * Logs out, terminates the connection to Discord, and destroys the client.
    *
    * @returns {Promise<void>}
    */
   async destroy() {
-    this.rest.clearHashSweeper();
-    this.rest.clearHandlerSweeper();
+    super.destroy();
 
     this.sweepers.destroy();
     await this.ws.destroy();
@@ -780,7 +701,10 @@ class Client extends AsyncEventEmitter {
   }
 
   toJSON() {
-    return flatten(this, { actions: false, presence: false });
+    return super.toJSON({
+      actions: false,
+      presence: false,
+    });
   }
 
   /**
@@ -873,10 +797,6 @@ class Client extends AsyncEventEmitter {
       throw new DiscordjsTypeError(ErrorCodes.ClientInvalidOption, 'jsonTransformer', 'a function');
     }
   }
-
-  async [Symbol.asyncDispose]() {
-    await this.destroy();
-  }
 }
 
 exports.Client = Client;
@@ -924,11 +844,6 @@ exports.Client = Client;
 /**
  * @external Collection
  * @see {@link https://discord.js.org/docs/packages/collection/stable/Collection:Class}
- */
-
-/**
- * @external REST
- * @see {@link https://discord.js.org/docs/packages/rest/stable/REST:Class}
  */
 
 /**

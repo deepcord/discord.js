@@ -38,7 +38,7 @@ class Role extends Base {
      */
     this.unicodeEmoji = null;
 
-    this._patch(data);
+    if (data) this._patch(data);
   }
 
   _patch(data) {
@@ -141,21 +141,15 @@ class Role extends Base {
     }
 
     /**
-     * The tags a role has
+     * The tags this role has
      *
-     * @typedef {Object} RoleTagData
+     * @type {?Object}
      * @property {Snowflake} [botId] The id of the bot this role belongs to
      * @property {Snowflake|string} [integrationId] The id of the integration this role belongs to
      * @property {true} [premiumSubscriberRole] Whether this is the guild's premium subscription role
      * @property {Snowflake} [subscriptionListingId] The id of this role's subscription SKU and listing
      * @property {true} [availableForPurchase] Whether this role is available for purchase
      * @property {true} [guildConnections] Whether this role is a guild's linked role
-     */
-
-    /**
-     * The tags this role has
-     *
-     * @type {?RoleTagData}
      */
     this.tags = data.tags ? {} : null;
     if (data.tags) {
@@ -277,6 +271,7 @@ class Role extends Base {
    *
    * @typedef {Object} RoleData
    * @property {string} [name] The name of the role
+   * @property {RoleColorsResolvable} [colors] The colors of the role
    * @property {boolean} [hoist] Whether or not the role should be hoisted
    * @property {number} [position] The position of the role
    * @property {PermissionResolvable} [permissions] The permissions of the role

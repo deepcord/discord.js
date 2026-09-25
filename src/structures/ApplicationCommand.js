@@ -136,11 +136,11 @@ class ApplicationCommand extends Base {
       /**
        * The options of this command
        *
-       * @type {?ApplicationCommandOption[]}
+       * @type {ApplicationCommandOption[]}
        */
       this.options = data.options.map(option => this.constructor.transformOption(option, true));
     } else {
-      this.options ??= null;
+      this.options ??= [];
     }
 
     if ('default_member_permissions' in data) {
@@ -276,9 +276,6 @@ class ApplicationCommand extends Base {
    * @property {ApplicationCommandOptionData[]} [options] Additional options if this option is a subcommand (group)
    * @property {ChannelType[]} [channelTypes] When the option type is channel,
    * the allowed types of channels that can be selected
-   * @property {FileUploadType[]} [fileTypes] When the option type is attachment,
-   * the allowed types of files that can be uploaded. When only using extensions, include `.jpg`
-   * for images and both `.mp4` and `.mov` for videos for mobile compatibility
    * @property {number} [minValue] The minimum value for an {@link ApplicationCommandOptionType.Integer} or
    * {@link ApplicationCommandOptionType.Number} option
    * @property {number} [maxValue] The maximum value for an {@link ApplicationCommandOptionType.Integer} or
@@ -439,7 +436,9 @@ class ApplicationCommand extends Base {
       ('version' in command && command.version !== this.version) ||
       (command.type && command.type !== this.type) ||
       ('nsfw' in command && command.nsfw !== this.nsfw) ||
-      command.options?.length !== this.options?.length ||
+      // Future proof for options being nullable
+      // TODO: remove ?? 0 on each when nullable
+      (command.options?.length ?? 0) !== (this.options?.length ?? 0) ||
       defaultMemberPermissions !== (this.defaultMemberPermissions?.bitfield ?? null) ||
       !isEqual(command.nameLocalizations ?? command.name_localizations ?? {}, this.nameLocalizations ?? {}) ||
       !isEqual(
@@ -453,7 +452,6 @@ class ApplicationCommand extends Base {
       return false;
     }
 
-    // Don't need to check both because we already checked the lengths above
     if (command.options) {
       return this.constructor.optionsEqual(this.options, command.options, enforceOptionOrder);
     }
@@ -512,7 +510,6 @@ class ApplicationCommand extends Base {
       option.choices?.length !== existing.choices?.length ||
       option.options?.length !== existing.options?.length ||
       (option.channelTypes ?? option.channel_types)?.length !== existing.channelTypes?.length ||
-      (option.fileTypes ?? option.file_types)?.length !== existing.fileTypes?.length ||
       (option.minValue ?? option.min_value) !== existing.minValue ||
       (option.maxValue ?? option.max_value) !== existing.maxValue ||
       (option.minLength ?? option.min_length) !== existing.minLength ||
@@ -558,13 +555,6 @@ class ApplicationCommand extends Base {
       }
     }
 
-    if (existing.fileTypes) {
-      const newTypes = option.fileTypes ?? option.file_types;
-      for (const type of existing.fileTypes) {
-        if (!newTypes.includes(type)) return false;
-      }
-    }
-
     if (existing.options) {
       return this.optionsEqual(existing.options, option.options, enforceOptionOrder);
     }
@@ -591,9 +581,6 @@ class ApplicationCommand extends Base {
    * @property {ApplicationCommandOption[]} [options] Additional options if this option is a subcommand (group)
    * @property {ApplicationCommandOptionAllowedChannelType[]} [channelTypes] When the option type is channel,
    * the allowed types of channels that can be selected
-   * @property {FileUploadType[]} [fileTypes] When the option type is attachment,
-   * the allowed types of files that can be uploaded. When only using extensions, include `.jpg`
-   * for images and both `.mp4` and `.mov` for videos for mobile compatibility
    * @property {number} [minValue] The minimum value for an {@link ApplicationCommandOptionType.Integer} or
    * {@link ApplicationCommandOptionType.Number} option
    * @property {number} [maxValue] The maximum value for an {@link ApplicationCommandOptionType.Integer} or
@@ -624,7 +611,6 @@ class ApplicationCommand extends Base {
    */
   static transformOption(option, received) {
     const channelTypesKey = received ? 'channelTypes' : 'channel_types';
-    const fileTypesKey = received ? 'fileTypes' : 'file_types';
     const minValueKey = received ? 'minValue' : 'min_value';
     const maxValueKey = received ? 'maxValue' : 'max_value';
     const minLengthKey = received ? 'minLength' : 'min_length';
@@ -656,7 +642,6 @@ class ApplicationCommand extends Base {
       })),
       options: option.options?.map(opt => this.transformOption(opt, received)),
       [channelTypesKey]: option.channelTypes ?? option.channel_types,
-      [fileTypesKey]: option.fileTypes ?? option.file_types,
       [minValueKey]: option.minValue ?? option.min_value,
       [maxValueKey]: option.maxValue ?? option.max_value,
       [minLengthKey]: option.minLength ?? option.min_length,

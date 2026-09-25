@@ -5,16 +5,12 @@ const { DefaultWebSocketManagerOptions } = require('@discordjs/ws');
 const { version } = require('../../package.json');
 const { toSnakeCase } = require('./Transformers.js');
 
-/**
- * @typedef {Object} CacheFactoryParams
- * @property {Function} holds The class that the cache will hold.
- * @property {Function} manager The fully extended manager class the cache is being requested from.
- * @property {Function} managerType The base manager class the cache is being requested from.
- */
-
+// TODO(ckohen): switch order of params so full manager is first and "type" is optional
 /**
  * @typedef {Function} CacheFactory
- * @param {CacheFactoryParams} params The parameters
+ * @param {Function} managerType The base manager class the cache is being requested from.
+ * @param {Function} holds The class that the cache will hold.
+ * @param {Function} manager The fully extended manager class the cache is being requested from.
  * @returns {Collection} A Collection used to store the cache of the manager.
  */
 
@@ -125,7 +121,7 @@ class Options extends null {
     const { Collection } = require('@discordjs/collection');
     const { LimitedCollection } = require('./LimitedCollection.js');
 
-    return ({ managerType, manager }) => {
+    return (managerType, _, manager) => {
       const setting = settings[manager.name] ?? settings[managerType.name];
       /* eslint-disable-next-line eqeqeq */
       if (setting == null) {

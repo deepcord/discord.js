@@ -2,7 +2,6 @@
 
 const { isJSONEncodable } = require('@discordjs/util');
 const snakeCase = require('lodash.snakecase');
-const { AuthorizingIntegrationOwners } = require('../structures/AuthorizingIntegrationOwners.js');
 
 /**
  * Transforms camel-cased keys into snake cased keys
@@ -49,10 +48,7 @@ function _transformAPIMessageInteractionMetadata(client, messageInteractionMetad
     id: messageInteractionMetadata.id,
     type: messageInteractionMetadata.type,
     user: client.users._add(messageInteractionMetadata.user),
-    authorizingIntegrationOwners: new AuthorizingIntegrationOwners(
-      client,
-      messageInteractionMetadata.authorizing_integration_owners,
-    ),
+    authorizingIntegrationOwners: messageInteractionMetadata.authorizing_integration_owners,
     originalResponseMessageId: messageInteractionMetadata.original_response_message_id ?? null,
     interactedMessageId: messageInteractionMetadata.interacted_message_id ?? null,
     triggeringInteractionMetadata: messageInteractionMetadata.triggering_interaction_metadata

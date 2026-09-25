@@ -23,7 +23,7 @@ class Webhook {
      * @readonly
      */
     Object.defineProperty(this, 'client', { value: client });
-    this._patch(data);
+    if (data) this._patch(data);
   }
 
   _patch(data) {
@@ -95,9 +95,9 @@ class Webhook {
       /**
        * The owner of the webhook
        *
-       * @type {?User}
+       * @type {?(User|APIUser)}
        */
-      this.owner = this.client.users._add(data.user);
+      this.owner = this.client.users?._add(data.user) ?? data.user;
     } else {
       this.owner ??= null;
     }
@@ -119,7 +119,7 @@ class Webhook {
        *
        * @type {?(Guild|APIGuild)}
        */
-      this.sourceGuild = this.client.guilds.cache.get(data.source_guild.id) ?? data.source_guild;
+      this.sourceGuild = this.client.guilds?.cache.get(data.source_guild.id) ?? data.source_guild;
     } else {
       this.sourceGuild ??= null;
     }
@@ -130,7 +130,7 @@ class Webhook {
        *
        * @type {?(AnnouncementChannel|APIChannel)}
        */
-      this.sourceChannel = this.client.channels.cache.get(data.source_channel?.id) ?? data.source_channel;
+      this.sourceChannel = this.client.channels?.cache.get(data.source_channel?.id) ?? data.source_channel;
     } else {
       this.sourceChannel ??= null;
     }
@@ -248,6 +248,7 @@ class Webhook {
       auth: false,
     });
 
+    if (!this.client.channels) return data;
     return (
       this.client.channels.cache.get(data.channel_id)?.messages._add(data, false) ??
       new (getMessage())(this.client, data)
@@ -344,6 +345,7 @@ class Webhook {
       auth: false,
     });
 
+    if (!this.client.channels) return data;
     return (
       this.client.channels.cache.get(data.channel_id)?.messages._add(data, false) ??
       new (getMessage())(this.client, data)
@@ -382,7 +384,10 @@ class Webhook {
       },
     );
 
-    const messageManager = this.client.channels.cache.get(data.channel_id)?.messages;
+    const channelManager = this.client.channels;
+    if (!channelManager) return data;
+
+    const messageManager = channelManager.cache.get(data.channel_id)?.messages;
     if (!messageManager) return new (getMessage())(this.client, data);
 
     const existing = messageManager.cache.get(data.id);

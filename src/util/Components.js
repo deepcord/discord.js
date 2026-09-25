@@ -1,36 +1,8 @@
+/* eslint-disable no-use-before-define */
 'use strict';
 
-const { lazy } = require('@discordjs/util');
+// eslint-disable-next-line import-x/order
 const { ComponentType } = require('discord-api-types/v10');
-
-// Fixes circular dependencies.
-const getActionRow = lazy(() => require('../structures/ActionRow.js').ActionRow);
-const getButtonComponent = lazy(() => require('../structures/ButtonComponent.js').ButtonComponent);
-const getChannelSelectMenuComponent = lazy(
-  () => require('../structures/ChannelSelectMenuComponent.js').ChannelSelectMenuComponent,
-);
-const getComponent = lazy(() => require('../structures/Component.js').Component);
-const getContainerComponent = lazy(() => require('../structures/ContainerComponent.js').ContainerComponent);
-const getFileComponent = lazy(() => require('../structures/FileComponent.js').FileComponent);
-const getLabelComponent = lazy(() => require('../structures/LabelComponent.js').LabelComponent);
-const getMediaGalleryComponent = lazy(() => require('../structures/MediaGalleryComponent.js').MediaGalleryComponent);
-const getMentionableSelectMenuComponent = lazy(
-  () => require('../structures/MentionableSelectMenuComponent.js').MentionableSelectMenuComponent,
-);
-const getRoleSelectMenuComponent = lazy(
-  () => require('../structures/RoleSelectMenuComponent.js').RoleSelectMenuComponent,
-);
-const getSectionComponent = lazy(() => require('../structures/SectionComponent.js').SectionComponent);
-const getSeparatorComponent = lazy(() => require('../structures/SeparatorComponent.js').SeparatorComponent);
-const getStringSelectMenuComponent = lazy(
-  () => require('../structures/StringSelectMenuComponent.js').StringSelectMenuComponent,
-);
-const getTextDisplayComponent = lazy(() => require('../structures/TextDisplayComponent.js').TextDisplayComponent);
-const getTextInputComponent = lazy(() => require('../structures/TextInputComponent.js').TextInputComponent);
-const getThumbnailComponent = lazy(() => require('../structures/ThumbnailComponent.js').ThumbnailComponent);
-const getUserSelectMenuComponent = lazy(
-  () => require('../structures/UserSelectMenuComponent.js').UserSelectMenuComponent,
-);
 
 /**
  * @typedef {Object} BaseComponentData
@@ -52,8 +24,7 @@ const getUserSelectMenuComponent = lazy(
 
 /**
  * @typedef {StringSelectMenuComponentData|TextInputComponentData|UserSelectMenuComponentData|
- * RoleSelectMenuComponentData|MentionableSelectMenuComponentData|ChannelSelectMenuComponentData|FileUploadComponentData|
- * RadioGroupComponentData|CheckboxGroupComponentData|CheckboxComponentData} ComponentInLabelData
+ * RoleSelectMenuComponentData|MentionableSelectMenuComponentData|ChannelSelectMenuComponentData} ComponentInLabelData
  */
 
 /**
@@ -74,59 +45,11 @@ const getUserSelectMenuComponent = lazy(
  */
 
 /**
- * @typedef {BaseComponentData} FileUploadComponentData
- * @property {string} customId The custom id of the file upload
- * @property {number} [minValues] The minimum number of files that must be uploaded (0-10)
- * @property {number} [maxValues] The maximum number of files that can be uploaded (1-10)
- * @property {FileUploadType[]} [fileTypes] The allowed types of files that can be uploaded (maximum of 10).
- * When only using extensions, include `.jpg` for images and both `.mp4` and `.mov` for videos for mobile compatibility
- * @property {boolean} [required] Whether this component is required in modals
- */
-
-/**
- * @typedef {Object} RadioGroupOption
- * @property {string} value The value of the radio group option
- * @property {string} label The label to use
- * @property {string} [description] The optional description for the radio group option
- * @property {boolean} [default] Whether this option is default selected
- */
-
-/**
- * @typedef {BaseComponentData} RadioGroupComponentData
- * @property {string} customId The custom id of the radio group
- * @property {RadioGroupOption[]} options The options in this radio group (2-10)
- * @property {boolean} [required] Whether this component is required in modals
- */
-
-/**
- * @typedef {Object} CheckboxGroupOption
- * @property {string} value The value of the checkbox group option
- * @property {string} label The label to use
- * @property {string} [description] The optional description for the checkbox group option
- * @property {boolean} [default] Whether this option is default selected
- */
-
-/**
- * @typedef {BaseComponentData} CheckboxGroupComponentData
- * @property {string} customId The custom id of the checkbox group
- * @property {CheckboxGroupOption[]} options The options in this checkbox group
- * @property {number} [minValues] The minimum number of options that must be selected (0-10)
- * @property {number} [maxValues] The maximum number of options that can be selected (defaults to options length)
- * @property {boolean} [required] Whether this component is required in modals
- */
-
-/**
- * @typedef {BaseComponentData} CheckboxComponentData
- * @property {string} customId The custom id of the checkbox
- * @property {boolean} [default] Whether this component is default selected in modals
- */
-
-/**
  * @typedef {BaseComponentData} BaseSelectMenuComponentData
  * @property {string} customId The custom id of the select menu
  * @property {boolean} [disabled] Whether the select menu is disabled or not
  * @property {number} [maxValues] The maximum amount of options that can be selected
- * @property {number} [minValues] The minimum amount of options that must be selected
+ * @property {number} [minValues] The minimum amount of options that can be selected
  * @property {string} [placeholder] The placeholder of the select menu
  * @property {boolean} [required] Whether this component is required in modals
  */
@@ -261,25 +184,6 @@ const getUserSelectMenuComponent = lazy(
  * SectionComponent|SeparatorComponent|TextDisplayComponent} MessageTopLevelComponent
  */
 
-const ComponentTypeToClass = {
-  [ComponentType.ActionRow]: getActionRow,
-  [ComponentType.Button]: getButtonComponent,
-  [ComponentType.StringSelect]: getStringSelectMenuComponent,
-  [ComponentType.TextInput]: getTextInputComponent,
-  [ComponentType.UserSelect]: getUserSelectMenuComponent,
-  [ComponentType.RoleSelect]: getRoleSelectMenuComponent,
-  [ComponentType.MentionableSelect]: getMentionableSelectMenuComponent,
-  [ComponentType.ChannelSelect]: getChannelSelectMenuComponent,
-  [ComponentType.Container]: getContainerComponent,
-  [ComponentType.TextDisplay]: getTextDisplayComponent,
-  [ComponentType.File]: getFileComponent,
-  [ComponentType.MediaGallery]: getMediaGalleryComponent,
-  [ComponentType.Section]: getSectionComponent,
-  [ComponentType.Separator]: getSeparatorComponent,
-  [ComponentType.Thumbnail]: getThumbnailComponent,
-  [ComponentType.Label]: getLabelComponent,
-};
-
 /**
  * Transforms API data into a component
  *
@@ -288,7 +192,7 @@ const ComponentTypeToClass = {
  * @ignore
  */
 function createComponent(data) {
-  return data instanceof getComponent() ? data : new (ComponentTypeToClass[data.type]?.() ?? getComponent())(data);
+  return data instanceof Component ? data : new (ComponentTypeToClass[data.type] ?? Component)(data);
 }
 
 /**
@@ -329,3 +233,40 @@ function findComponentByCustomId(components, customId) {
 
 exports.createComponent = createComponent;
 exports.findComponentByCustomId = findComponentByCustomId;
+
+const { ActionRow } = require('../structures/ActionRow.js');
+const { ButtonComponent } = require('../structures/ButtonComponent.js');
+const { ChannelSelectMenuComponent } = require('../structures/ChannelSelectMenuComponent.js');
+const { Component } = require('../structures/Component.js');
+const { ContainerComponent } = require('../structures/ContainerComponent.js');
+const { FileComponent } = require('../structures/FileComponent.js');
+const { LabelComponent } = require('../structures/LabelComponent.js');
+const { MediaGalleryComponent } = require('../structures/MediaGalleryComponent.js');
+const { MentionableSelectMenuComponent } = require('../structures/MentionableSelectMenuComponent.js');
+const { RoleSelectMenuComponent } = require('../structures/RoleSelectMenuComponent.js');
+const { SectionComponent } = require('../structures/SectionComponent.js');
+const { SeparatorComponent } = require('../structures/SeparatorComponent.js');
+const { StringSelectMenuComponent } = require('../structures/StringSelectMenuComponent.js');
+const { TextDisplayComponent } = require('../structures/TextDisplayComponent.js');
+const { TextInputComponent } = require('../structures/TextInputComponent.js');
+const { ThumbnailComponent } = require('../structures/ThumbnailComponent.js');
+const { UserSelectMenuComponent } = require('../structures/UserSelectMenuComponent.js');
+
+const ComponentTypeToClass = {
+  [ComponentType.ActionRow]: ActionRow,
+  [ComponentType.Button]: ButtonComponent,
+  [ComponentType.StringSelect]: StringSelectMenuComponent,
+  [ComponentType.TextInput]: TextInputComponent,
+  [ComponentType.UserSelect]: UserSelectMenuComponent,
+  [ComponentType.RoleSelect]: RoleSelectMenuComponent,
+  [ComponentType.MentionableSelect]: MentionableSelectMenuComponent,
+  [ComponentType.ChannelSelect]: ChannelSelectMenuComponent,
+  [ComponentType.Container]: ContainerComponent,
+  [ComponentType.TextDisplay]: TextDisplayComponent,
+  [ComponentType.File]: FileComponent,
+  [ComponentType.MediaGallery]: MediaGalleryComponent,
+  [ComponentType.Section]: SectionComponent,
+  [ComponentType.Separator]: SeparatorComponent,
+  [ComponentType.Thumbnail]: ThumbnailComponent,
+  [ComponentType.Label]: LabelComponent,
+};
